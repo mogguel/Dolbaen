@@ -1,0 +1,672 @@
+--[[
+    FIND MY × RIVALS  |  v4
+    by find my
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local VirtualUser = game:GetService("VirtualUser")
+local StarterGui = game:GetService("StarterGui")
+
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Mouse = LP:GetMouse()
+
+local S = {
+    Aimbot = false,
+    SilentAim = false,
+    Umbrella = true,
+    Tracers = true,
+    EnemyAlert = true,
+    Skeleton = false,
+    HPBar = false,
+    SpeedEnabled = false,
+    Speed = 28,
+    Fly = false,
+    FlySpeed = 55,
+    XRay = false,
+    SafeMode = false,
+    AutoPlay = false,
+}
+
+local Keybinds = {}
+local WaitingKey = nil
+local Closest = nil
+local GuiOpen = true
+local Checking = false
+local oldSubject = nil
+local flyBV = nil
+local xrayMap = {}
+local silentPart = nil
+
+local function GetClosest()
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil, 9e9 end
+    local best, bestD = nil, 9e9
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                if not (p.Team and LP.Team and p.Team == LP.Team) then
+                    local d = (hrp.Position - root.Position).Magnitude
+                    if d < bestD then bestD, best = d, p end
+                end
+            end
+        end
+    end
+    return best, bestD
+end
+
+local function Notify(msg)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {Title = "Find My", Text = msg, Duration = 2})
+    end)
+end
+
+local SG = Instance.new("ScreenGui")
+SG.Name = "FindMyV4"
+SG.ResetOnSpawn = false
+SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() SG.Parent = CoreGui end)
+if not SG.Parent then SG.Parent = LP:WaitForChild("PlayerGui") end
+
+local Skull = Instance.new("TextButton")
+Skull.Size = UDim2.new(0, 56, 0, 56)
+Skull.Position = UDim2.new(1, -72, 0.5, -28)
+Skull.BackgroundColor3 = Color3.fromRGB(22, 10, 14)
+Skull.Text = "💀"
+Skull.TextSize = 30
+Skull.Visible = false
+Skull.ZIndex = 50
+Skull.Parent = SG
+Instance.new("UICorner", Skull).CornerRadius = UDim.new(1, 0)
+local sks = Instance.new("UIStroke", Skull)
+sks.Color = Color3.fromRGB(255, 120, 40)
+sks.Thickness = 2
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 400, 0, 520)
+Main.Position = UDim2.new(0.5, -200, 0.4, -260)
+Main.BackgroundColor3 = Color3.fromRGB(12, 6, 10)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = SG
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
+local ms = Instance.new("UIStroke", Main)
+ms.Color = Color3.fromRGB(255, 110, 35)
+ms.Thickness = 1.5
+ms.Transparency = 0.15
+
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 50)
+Header.BackgroundColor3 = Color3.fromRGB(20, 9, 13)
+Header.BorderSizePixel = 0
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 16)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, -90, 1, 0)
+Title.Position = UDim2.new(0, 16, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "FIND MY  ·  RIVALS"
+Title.TextColor3 = Color3.fromRGB(255, 145, 50)
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local Close = Instance.new("TextButton", Header)
+Close.Size = UDim2.new(0, 32, 0, 32)
+Close.Position = UDim2.new(1, -42, 0, 9)
+Close.BackgroundColor3 = Color3.fromRGB(160, 30, 40)
+Close.Text = "×"
+Close.TextColor3 = Color3.new(1,1,1)
+Close.Font = Enum.Font.GothamBold
+Close.TextSize = 20
+Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 8)
+
+Close.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    GuiOpen = false
+    Skull.Visible = true
+end)
+Skull.MouseButton1Click:Connect(function()
+    Main.Visible = true
+    GuiOpen = true
+    Skull.Visible = false
+end)
+
+local TabBar = Instance.new("Frame", Main)
+TabBar.Size = UDim2.new(1, -24, 0, 34)
+TabBar.Position = UDim2.new(0, 12, 0, 58)
+TabBar.BackgroundTransparency = 1
+
+local function TabBtn(name, order)
+    local b = Instance.new("TextButton", TabBar)
+    b.Size = UDim2.new(0.333, -4, 1, 0)
+    b.Position = UDim2.new(order * 0.333, 2, 0, 0)
+    b.BackgroundColor3 = Color3.fromRGB(30, 14, 18)
+    b.Text = name
+    b.TextColor3 = Color3.fromRGB(200, 170, 140)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local TAim = TabBtn("AIM", 0)
+local TESP = TabBtn("ESP", 1)
+local TMisc = TabBtn("MISC", 2)
+
+local function Page()
+    local f = Instance.new("ScrollingFrame", Main)
+    f.Size = UDim2.new(1, -24, 1, -110)
+    f.Position = UDim2.new(0, 12, 0, 100)
+    f.BackgroundTransparency = 1
+    f.BorderSizePixel = 0
+    f.ScrollBarThickness = 3
+    f.ScrollBarImageColor3 = Color3.fromRGB(255, 120, 40)
+    f.CanvasSize = UDim2.new(0, 0, 0, 700)
+    f.Visible = false
+    return f
+end
+
+local PAim, PESP, PMisc = Page(), Page(), Page()
+PAim.Visible = true
+
+local function Switch(n)
+    PAim.Visible = n == 1
+    PESP.Visible = n == 2
+    PMisc.Visible = n == 3
+    TAim.BackgroundColor3 = n == 1 and Color3.fromRGB(255, 110, 35) or Color3.fromRGB(30, 14, 18)
+    TESP.BackgroundColor3 = n == 2 and Color3.fromRGB(255, 110, 35) or Color3.fromRGB(30, 14, 18)
+    TMisc.BackgroundColor3 = n == 3 and Color3.fromRGB(255, 110, 35) or Color3.fromRGB(30, 14, 18)
+    TAim.TextColor3 = n == 1 and Color3.new(1,1,1) or Color3.fromRGB(200, 170, 140)
+    TESP.TextColor3 = n == 2 and Color3.new(1,1,1) or Color3.fromRGB(200, 170, 140)
+    TMisc.TextColor3 = n == 3 and Color3.new(1,1,1) or Color3.fromRGB(200, 170, 140)
+end
+TAim.MouseButton1Click:Connect(function() Switch(1) end)
+TESP.MouseButton1Click:Connect(function() Switch(2) end)
+TMisc.MouseButton1Click:Connect(function() Switch(3) end)
+Switch(1)
+
+local function AddToggle(parent, y, label, key, default)
+    S[key] = default
+    local row = Instance.new("Frame", parent)
+    row.Size = UDim2.new(1, 0, 0, 40)
+    row.Position = UDim2.new(0, 0, 0, y)
+    row.BackgroundColor3 = Color3.fromRGB(22, 10, 14)
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+
+    local lab = Instance.new("TextLabel", row)
+    lab.Size = UDim2.new(0.55, 0, 1, 0)
+    lab.Position = UDim2.new(0, 12, 0, 0)
+    lab.BackgroundTransparency = 1
+    lab.Text = label
+    lab.TextColor3 = Color3.fromRGB(235, 215, 195)
+    lab.Font = Enum.Font.GothamMedium
+    lab.TextSize = 13
+    lab.TextXAlignment = Enum.TextXAlignment.Left
+
+    local keyBtn = Instance.new("TextButton", row)
+    keyBtn.Size = UDim2.new(0, 40, 0, 26)
+    keyBtn.Position = UDim2.new(1, -108, 0.5, -13)
+    keyBtn.BackgroundColor3 = Color3.fromRGB(35, 18, 24)
+    keyBtn.Text = "—"
+    keyBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+    keyBtn.Font = Enum.Font.GothamBold
+    keyBtn.TextSize = 11
+    Instance.new("UICorner", keyBtn).CornerRadius = UDim.new(0, 6)
+
+    local btn = Instance.new("TextButton", row)
+    btn.Size = UDim2.new(0, 54, 0, 26)
+    btn.Position = UDim2.new(1, -60, 0.5, -13)
+    btn.BackgroundColor3 = default and Color3.fromRGB(255, 120, 40) or Color3.fromRGB(45, 25, 32)
+    btn.Text = default and "ON" or "OFF"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local function set(v)
+        S[key] = v
+        btn.Text = v and "ON" or "OFF"
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = v and Color3.fromRGB(255, 120, 40) or Color3.fromRGB(45, 25, 32)
+        }):Play()
+    end
+
+    btn.MouseButton1Click:Connect(function() set(not S[key]) end)
+    keyBtn.MouseButton1Click:Connect(function()
+        keyBtn.Text = "..."
+        WaitingKey = key
+    end)
+    task.spawn(function()
+        while task.wait(0.25) do
+            if Keybinds[key] then
+                keyBtn.Text = tostring(Keybinds[key]):gsub("Enum.KeyCode.", "")
+            end
+        end
+    end)
+    return set
+end
+
+local function AddButton(parent, y, text, cb)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(1, 0, 0, 40)
+    b.Position = UDim2.new(0, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(255, 100, 35)
+    b.Text = text
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    b.MouseButton1Click:Connect(cb)
+end
+
+AddToggle(PAim, 0, "Aimbot (камера)", "Aimbot", false)
+AddToggle(PAim, 48, "Silent Aim (пули)", "SilentAim", false)
+AddToggle(PAim, 96, "Auto Play (играет за тебя)", "AutoPlay", false)
+
+AddToggle(PESP, 0, "Зонтик 3D", "Umbrella", true)
+AddToggle(PESP, 48, "Tracers", "Tracers", true)
+AddToggle(PESP, 96, "ВРАГИ РЯДОМ", "EnemyAlert", true)
+AddToggle(PESP, 144, "Skeleton (зелёный)", "Skeleton", false)
+AddToggle(PESP, 192, "HP Bar", "HPBar", false)
+
+AddToggle(PMisc, 0, "Speed", "SpeedEnabled", false)
+AddToggle(PMisc, 48, "Fly", "Fly", false)
+AddToggle(PMisc, 96, "X-Ray (стены)", "XRay", false)
+AddToggle(PMisc, 144, "Safe Mode (над головой)", "SafeMode", false)
+
+AddButton(PMisc, 200, "TELEPORT за спину", function()
+    local e = Closest
+    if e and e.Character and e.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        LP.Character.HumanoidRootPart.CFrame = e.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3.2)
+        Notify("TP behind")
+    end
+end)
+
+AddButton(PMisc, 248, "CHECK 10 сек (камера)", function()
+    if Checking then return end
+    local e = Closest
+    if not e or not e.Character then return end
+    local hum = e.Character:FindFirstChild("Humanoid")
+    if not hum then return end
+    Checking = true
+    oldSubject = Camera.CameraSubject
+    Camera.CameraSubject = hum
+    Notify("Check 10s")
+    task.delay(10, function()
+        if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+            Camera.CameraSubject = LP.Character.Humanoid
+        elseif oldSubject then
+            Camera.CameraSubject = oldSubject
+        end
+        Checking = false
+        Notify("Check off")
+    end)
+end)
+
+local speedBox = Instance.new("TextBox", PMisc)
+speedBox.Size = UDim2.new(1, 0, 0, 34)
+speedBox.Position = UDim2.new(0, 0, 0, 300)
+speedBox.BackgroundColor3 = Color3.fromRGB(28, 12, 16)
+speedBox.Text = "28"
+speedBox.PlaceholderText = "WalkSpeed"
+speedBox.TextColor3 = Color3.new(1,1,1)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 13
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 8)
+speedBox.FocusLost:Connect(function()
+    local n = tonumber(speedBox.Text)
+    if n and n > 0 then S.Speed = n end
+end)
+
+local Alert = Instance.new("TextLabel", SG)
+Alert.Size = UDim2.new(0, 260, 0, 34)
+Alert.Position = UDim2.new(0.5, -130, 0, 14)
+Alert.BackgroundColor3 = Color3.fromRGB(180, 15, 20)
+Alert.Text = "ВРАГИ РЯДОМ!"
+Alert.TextColor3 = Color3.new(1,1,1)
+Alert.Font = Enum.Font.GothamBlack
+Alert.TextSize = 16
+Alert.Visible = false
+Instance.new("UICorner", Alert).CornerRadius = UDim.new(0, 8)
+
+UIS.InputBegan:Connect(function(inp, gpe)
+    if gpe then return end
+    if inp.KeyCode == Enum.KeyCode.RightShift then
+        GuiOpen = not GuiOpen
+        Main.Visible = GuiOpen
+        Skull.Visible = not GuiOpen
+        return
+    end
+    if WaitingKey and inp.UserInputType == Enum.UserInputType.Keyboard then
+        Keybinds[WaitingKey] = inp.KeyCode
+        WaitingKey = nil
+        return
+    end
+    for k, code in pairs(Keybinds) do
+        if code == inp.KeyCode then
+            S[k] = not S[k]
+        end
+    end
+end)
+
+local TracerFolder = Instance.new("Folder", workspace)
+TracerFolder.Name = "FM_Tracers"
+local SkelFolder = Instance.new("Folder", workspace)
+SkelFolder.Name = "FM_Skeleton"
+
+local function clearFolder(f)
+    for _, c in ipairs(f:GetChildren()) do c:Destroy() end
+end
+
+local function MakeUmbrella(head)
+    if head:FindFirstChild("FM_Umbrella") then head.FM_Umbrella:Destroy() end
+    local m = Instance.new("Model")
+    m.Name = "FM_Umbrella"
+    m.Parent = head
+    local handle = Instance.new("Part")
+    handle.Size = Vector3.new(0.4, 6, 0.4)
+    handle.Color = Color3.fromRGB(25, 25, 25)
+    handle.Material = Enum.Material.SmoothPlastic
+    handle.CanCollide = false
+    handle.Massless = true
+    handle.Parent = m
+    local top = Instance.new("Part")
+    top.Size = Vector3.new(14, 1.2, 14)
+    top.Color = Color3.fromRGB(0, 255, 90)
+    top.Material = Enum.Material.Neon
+    top.CanCollide = false
+    top.Massless = true
+    top.Parent = m
+    local mesh = Instance.new("SpecialMesh", top)
+    mesh.MeshType = Enum.MeshType.Sphere
+    mesh.Scale = Vector3.new(1, 0.22, 1)
+    local w1 = Instance.new("Weld")
+    w1.Part0 = head
+    w1.Part1 = handle
+    w1.C0 = CFrame.new(0, 6.5, 0)
+    w1.Parent = handle
+    local w2 = Instance.new("Weld")
+    w2.Part0 = handle
+    w2.Part1 = top
+    w2.C0 = CFrame.new(0, 3.2, 0)
+    w2.Parent = top
+end
+
+local function MakeTracer(a, b)
+    local a0 = Instance.new("Attachment", a)
+    local a1 = Instance.new("Attachment", b)
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = a0
+    beam.Attachment1 = a1
+    beam.Width0 = 0.12
+    beam.Width1 = 0.12
+    beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 100))
+    beam.FaceCamera = true
+    beam.LightEmission = 1
+    beam.Transparency = NumberSequence.new(0.1)
+    beam.Parent = TracerFolder
+    beam.Destroying:Connect(function() a0:Destroy() a1:Destroy() end)
+end
+
+local function bone(p0, p1)
+    if not p0 or not p1 then return end
+    local a0 = Instance.new("Attachment", p0)
+    local a1 = Instance.new("Attachment", p1)
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = a0
+    beam.Attachment1 = a1
+    beam.Width0 = 0.09
+    beam.Width1 = 0.09
+    beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 80))
+    beam.FaceCamera = true
+    beam.LightEmission = 1
+    beam.Transparency = NumberSequence.new(0)
+    beam.Parent = SkelFolder
+    beam.Destroying:Connect(function() a0:Destroy() a1:Destroy() end)
+end
+
+local function MakeSkeleton(char)
+    clearFolder(SkelFolder)
+    local links = {
+        {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+        {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
+        {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
+        {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
+        {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+        {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"},
+    }
+    for _, L in ipairs(links) do
+        bone(char:FindFirstChild(L[1]), char:FindFirstChild(L[2]))
+    end
+    if not char:FindFirstChild("FM_HL") then
+        local hl = Instance.new("Highlight")
+        hl.Name = "FM_HL"
+        hl.FillColor = Color3.fromRGB(0, 255, 90)
+        hl.OutlineColor = Color3.fromRGB(0, 255, 140)
+        hl.FillTransparency = 0.7
+        hl.OutlineTransparency = 0
+        hl.Parent = char
+    end
+end
+
+local function MakeHP(char)
+    local head = char:FindFirstChild("Head")
+    local hum = char:FindFirstChild("Humanoid")
+    if not head or not hum then return end
+    if head:FindFirstChild("FM_HP") then head.FM_HP:Destroy() end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "FM_HP"
+    bb.Adornee = head
+    bb.Size = UDim2.new(0, 90, 0, 12)
+    bb.StudsOffset = Vector3.new(0, 4.2, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = head
+    local bg = Instance.new("Frame", bb)
+    bg.Size = UDim2.new(1,0,1,0)
+    bg.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    bg.BorderSizePixel = 0
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 4)
+    local fill = Instance.new("Frame", bg)
+    fill.Size = UDim2.new(math.clamp(hum.Health/math.max(hum.MaxHealth,1),0,1),0,1,0)
+    fill.BackgroundColor3 = Color3.fromRGB(0,255,100)
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 4)
+    hum.HealthChanged:Connect(function()
+        if fill.Parent then
+            fill.Size = UDim2.new(math.clamp(hum.Health/math.max(hum.MaxHealth,1),0,1),0,1,0)
+        end
+    end)
+end
+
+local function NameTag()
+    local c = LP.Character
+    if not c then return end
+    local h = c:FindFirstChild("Head")
+    if not h then return end
+    if h:FindFirstChild("FM_Tag") then h.FM_Tag:Destroy() end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "FM_Tag"
+    bb.Adornee = h
+    bb.Size = UDim2.new(0, 150, 0, 28)
+    bb.StudsOffset = Vector3.new(0, 2.2, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = h
+    local t = Instance.new("TextLabel", bb)
+    t.Size = UDim2.new(1,0,1,0)
+    t.BackgroundTransparency = 1
+    t.Text = "by find my"
+    t.TextColor3 = Color3.fromRGB(255,140,40)
+    t.Font = Enum.Font.GothamBold
+    t.TextSize = 14
+    t.TextStrokeTransparency = 0.3
+end
+
+pcall(function()
+    local mt = getrawmetatable(Mouse) or getrawmetatable(game)
+    local old = mt.__index
+    setreadonly(mt, false)
+    mt.__index = newcclosure(function(self, k)
+        if S.SilentAim and silentPart and silentPart.Parent then
+            if rawequal(self, Mouse) then
+                if k == "Hit" then return silentPart.CFrame
+                elseif k == "Target" then return silentPart
+                elseif k == "UnitRay" then
+                    local origin = Camera.CFrame.Position
+                    local dir = (silentPart.Position - origin).Unit
+                    return Ray.new(origin, dir * 1000)
+                end
+            end
+        end
+        return old(self, k)
+    end)
+    setreadonly(mt, true)
+end)
+
+RunService.RenderStepped:Connect(function()
+    clearFolder(TracerFolder)
+    if not S.Skeleton then
+        clearFolder(SkelFolder)
+        if Closest and Closest.Character and Closest.Character:FindFirstChild("FM_HL") then
+            Closest.Character.FM_HL:Destroy()
+        end
+    end
+
+    local enemy, dist = GetClosest()
+    Closest = enemy
+
+    if S.SilentAim and enemy and enemy.Character then
+        silentPart = enemy.Character:FindFirstChild("Head") or enemy.Character:FindFirstChild("HumanoidRootPart")
+    else
+        silentPart = nil
+    end
+
+    if S.Aimbot and not Checking and enemy and enemy.Character then
+        local part = enemy.Character:FindFirstChild("Head") or enemy.Character:FindFirstChild("HumanoidRootPart")
+        if part then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, part.Position) end
+    end
+
+    if S.AutoPlay and enemy and enemy.Character and not Checking then
+        local part = enemy.Character:FindFirstChild("Head") or enemy.Character:FindFirstChild("HumanoidRootPart")
+        if part then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, part.Position)
+            pcall(function()
+                VirtualUser:Button1Down(Vector2.new(), Camera.CFrame)
+                task.wait(0.05)
+                VirtualUser:Button1Up(Vector2.new(), Camera.CFrame)
+            end)
+        end
+    end
+
+    if S.SafeMode and enemy and enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+        if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local t = enemy.Character.HumanoidRootPart
+            LP.Character.HumanoidRootPart.CFrame = CFrame.new(t.Position + Vector3.new(0, 25, 0))
+        end
+    end
+
+    Alert.Visible = S.EnemyAlert and enemy ~= nil and dist <= 15
+
+    if enemy and enemy.Character then
+        local head = enemy.Character:FindFirstChild("Head")
+        local hrp = enemy.Character:FindFirstChild("HumanoidRootPart")
+        if S.Umbrella and head then
+            if not head:FindFirstChild("FM_Umbrella") then MakeUmbrella(head) end
+        elseif head and head:FindFirstChild("FM_Umbrella") then
+            head.FM_Umbrella:Destroy()
+        end
+        if S.Tracers and hrp and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            MakeTracer(LP.Character.HumanoidRootPart, hrp)
+        end
+        if S.Skeleton then MakeSkeleton(enemy.Character) end
+        if S.HPBar then MakeHP(enemy.Character)
+        elseif head and head:FindFirstChild("FM_HP") then head.FM_HP:Destroy() end
+    end
+
+    if S.SpeedEnabled and LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = S.Speed
+    end
+
+    if S.Fly and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        if not flyBV or not flyBV.Parent then
+            flyBV = Instance.new("BodyVelocity")
+            flyBV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyBV.Parent = hrp
+        end
+        local dir = Vector3.zero
+        if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.yAxis end
+        flyBV.Velocity = dir.Magnitude > 0 and dir.Unit * S.FlySpeed or Vector3.zero
+    elseif flyBV then
+        flyBV:Destroy()
+        flyBV = nil
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.6) do
+        if S.XRay then
+            for _, o in ipairs(workspace:GetDescendants()) do
+                if o:IsA("BasePart") then
+                    local skip = false
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and o:IsDescendantOf(p.Character) then skip = true break end
+                    end
+                    if not skip then
+                        if not xrayMap[o] then xrayMap[o] = o.Transparency end
+                        if o.Transparency < 0.85 then o.Transparency = 0.9 end
+                    end
+                end
+            end
+        else
+            for part, old in pairs(xrayMap) do
+                if part and part.Parent then part.Transparency = old end
+            end
+            xrayMap = {}
+        end
+    end
+end)
+
+pcall(function()
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local m = getnamecallmethod()
+        if m == "Kick" or m == "kick" then return end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end)
+
+LP.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    NameTag()
+    if Checking then
+        Checking = false
+        if LP.Character:FindFirstChild("Humanoid") then
+            Camera.CameraSubject = LP.Character.Humanoid
+        end
+    end
+end)
+if LP.Character then NameTag() end
+
+LP.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+print("✅ Find My Rivals v4 loaded")
+print("💀 / RightShift = menu")
